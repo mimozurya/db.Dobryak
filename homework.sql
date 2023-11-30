@@ -69,7 +69,7 @@ drop table ChangesGroup
 drop table Players
 drop table Groups
 
--- 1
+-- 1 в алфавитном порядке исполнителей
 
 DECLARE @searchDirection NVARCHAR(50) = 'Рок' -- замените на нужное направление поиска
 
@@ -110,7 +110,7 @@ BEGIN
     PRINT 'Не найдено соответствующих музыкальных направлений.'
 END
 
--- 2
+-- 2 фио исполнителя, с наибольшими и наименьшим участием
 
 SELECT
     Players.FIO AS Performer,
@@ -126,7 +126,7 @@ WHERE
 ORDER BY
     DATEDIFF(day, ChangesGroup.dateEntrance, ChangesGroup.dateExit) ASC;
 
--- 3
+-- 3 изменение первичного ключа
 
 CREATE PROCEDURE UpdatePlayerId
   @oldId int,
@@ -140,14 +140,14 @@ END
 
 EXEC UpdatePlayerId @oldId = 3, @newId = 4
 
--- 4
+-- 4 удаление пользователя, получившего новый номер
 
 DECLARE @PlayerId INT;
-SET @PlayerId = -- id которое надо удалить
+SET @PlayerId = 7-- id которое надо удалить
 DELETE FROM ChangesGroup WHERE idPlayer = @PlayerId;
 DELETE FROM Players WHERE idPlayer = @PlayerId;
 
--- 5
+-- 5 средний возраст исполнителя
 
 CREATE PROCEDURE CalculateAverageAgeByRole
   @roleInGroup nvarchar(100)
@@ -158,25 +158,25 @@ BEGIN
   DECLARE @totalAge int;
   DECLARE @totalCount int;
 
-  -- Calculate total age and count for the given role
+  -- считает общий возраст и суммирует
   SELECT @totalAge = SUM(DATEDIFF(YEAR, birthday, GETDATE())),
          @totalCount = COUNT(*)
   FROM Players
   WHERE roleInGroup COLLATE SQL_Latin1_General_CP1_CI_AS = @roleInGroup
     AND idPlayer NOT IN (SELECT idPlayer FROM ChangesGroup WHERE dateExit IS NULL);
 
-  -- Check if role exists
+  -- проверяет если человек вышел
   IF @totalAge IS NULL OR @totalCount IS NULL
   BEGIN
     SELECT NULL AS AverageAge, NULL AS GroupName;
     RETURN;
   END;
 
-  -- Calculate average age
+  -- считает средний возраст
   DECLARE @averageAge float;
   SET @averageAge = CAST(@totalAge AS float) / @totalCount;
 
-  -- Get top 3 groups with highest performer count
+  -- получает топ3 группы с наибольшим кол-вом исполнителей
   SELECT TOP 3 G.nameGroup AS GroupName, COUNT(*) AS PerformerCount
   FROM Groups G
   INNER JOIN Players P ON G.idGroup = P.idGroup
@@ -186,3 +186,57 @@ BEGIN
 
   SELECT @averageAge AS AverageAge, NULL AS GroupName;
 END;
+
+-- 8 лабораторная
+
+-- создание копии исходной таблицы
+SELECT *
+INTO GroupsCopy
+FROM Groups
+
+SELECT *
+INTO PlayersCopy
+FROM Players
+
+SELECT *
+INTO ChangesGroupCopy
+FROM ChangesGroup
+
+-- создание справочной таблицы музыкальных направлений
+CREATE TABLE MusicDirections
+(
+  idDirection int identity primary key,
+  nameDirection nvarchar(50) not null
+)
+
+-- заполнение справочной таблицы значениями из столбца direction Groups
+INSERT INTO MusicDirections (nameDirection)
+SELECT DISTINCT direction
+FROM Groups
+select * from MusicDirections
+-- модификация структуры и данных исходной таблицы Groups
+ALTER TABLE Groups
+DROP COLUMN direction
+
+ALTER TABLE Groups
+ADD directionID int
+
+UPDATE G
+SET directionID = MD.idDirection
+FROM Groups G
+JOIN MusicDirections MD ON G.direction = MD.nameDirection
+
+-- Демонстрация
+SELECT G.idGroup, G.nameGroup, MD.nameDirection AS direction, G.director, G.creature, G.decay
+FROM Groups G
+JOIN MusicDirections MD ON G.directionID = MD.idDirection
+select * from Groups
+
+
+drop table ChangesGroupCopy
+drop table GroupsCopy
+drop table PlayersCopy
+drop table MusicDirections
+drop table Groups
+drop table ChangesGroup
+drop table Players
